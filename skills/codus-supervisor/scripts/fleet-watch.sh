@@ -5,6 +5,9 @@
 #   STATE    capacity changed (ok / tight / critical), confirmed on two samples
 #            in a row (critical is reported at once)
 #   RECLAIM  memory is not ok and idle agents hold at least RECLAIM_MB
+#   ROOM     advise mode only: memory is ok, at least ROOM_MIN more agents fit,
+#            and working Brains are due a nudge (every ROOM_EVERY_MIN minutes
+#            each, skipping any that declined in the last ROOM_DECLINE_MIN)
 #   TICK     TICK_MIN minutes passed (periodic review)
 #   ERROR    the sampler failed three times in a row
 #   ALREADY_RUNNING  another watcher owns this state folder
@@ -16,6 +19,7 @@
 #                                    each exit wakes the Brain.
 #   fleet-watch.sh                   run until stopped, printing events
 #   fleet-watch.sh --stop            stop the running watcher for this folder
+#   fleet-watch.sh --decline ID      Brain ID has nothing to split: pause its ROOM nudges
 #   Options: --interval SEC, --max-minutes N
 set -u
 
@@ -26,10 +30,12 @@ once=0
 exit_on_event=0
 stop=0
 max_sec=0
+decline_id=
 while [ $# -gt 0 ]; do
   case $1 in
     --once) once=1 ;;
     --stop) stop=1 ;;
+    --decline) shift; decline_id=${1:?--decline needs a Brain id} ;;
     --exit-on-event) exit_on_event=1 ;;
     --interval) shift; INTERVAL_SEC=${1:?--interval needs seconds} ;;
     --max-minutes) shift; max_sec=$((${1:?--max-minutes needs a number} * 60)) ;;
@@ -48,6 +54,15 @@ evlog=$CS_HOME/events.log
 errlog=$CS_HOME/errors.log
 pidf=$CS_HOME/watch.pid
 statef=$CS_HOME/watch.state
+roomf=$CS_HOME/room.state
+declf=$CS_HOME/decline.log
+
+if [ -n "$decline_id" ]; then
+  case $decline_id in *[!A-Za-z0-9_-]*) echo "fleet-watch.sh: not a Brain id: $decline_id" >&2; exit 2 ;; esac
+  printf '%s %s\n' "$(date +%s)" "$decline_id" >>"$declf"
+  echo "ok: no ROOM nudges for $decline_id for $ROOM_DECLINE_MIN minutes"
+  exit 0
+fi
 
 emit() {
   ev_line="[codus-supervisor] $(date -u +%Y-%m-%dT%H:%M:%SZ) $*"
@@ -126,7 +141,7 @@ while :; do
   else
     fails=0
     mv "$snap_tmp" "$snap"
-    state= pressure= free_pct= swap_used_mb= swap_total_mb= agents= busy= idle= idle_mb= est_extra= reason= idle_list= summary=
+    state= pressure= free_pct= swap_used_mb= swap_total_mb= agents= busy= idle= idle_mb= est_extra= reason= idle_list= summary= active_brains=
     while IFS= read -r line; do
       v=${line#*=}
       case $line in
@@ -142,6 +157,7 @@ while :; do
         est_extra=*) est_extra=$v ;;
         reason=*) reason=$v ;;
         idle_list=*) idle_list=$v ;;
+        active_brains=*) active_brains=$v ;;
         summary=*) summary=$v ;;
       esac
     done <<EOF
@@ -160,7 +176,7 @@ EOF
       exit 0
     fi
 
-    details="pressure=$pressure available=${free_pct}% swap=${swap_used_mb}/${swap_total_mb}MB agents=$agents busy=$busy idle=$idle idle_mb=$idle_mb room=$est_extra reason=\"$reason\""
+    details="pressure=$pressure available=${free_pct}% swap=${swap_used_mb}/${swap_total_mb}MB agents=$agents busy=$busy idle=$idle idle_mb=$idle_mb room=$est_extra brains=${active_brains:-none} reason=\"$reason\""
     if [ -z "$last_state" ]; then
       # First run: this reading is the baseline, not a change.
       last_state=$state
@@ -188,6 +204,28 @@ EOF
       emit "RECLAIM idle agents hold ${idle_mb}MB while memory is $state: $idle_list"
       last_reclaim=$now
       fired=1
+    fi
+
+    # Advise mode: nudge working Brains while there is room, each at most every
+    # ROOM_EVERY_MIN minutes, skipping Brains that declined recently.
+    if [ "$MODE" = advise ] && [ "$state" = ok ] && [ "${est_extra:-0}" -ge "$ROOM_MIN" ] &&
+      [ -n "$active_brains" ]; then
+      targets=
+      for b in $(printf '%s' "$active_brains" | tr ',' ' '); do
+        declined=$(awk -v id="$b" '$2 == id { t = $1 } END { print t + 0 }' "$declf" 2>/dev/null || echo 0)
+        [ $((now - ${declined:-0})) -lt $((ROOM_DECLINE_MIN * 60)) ] && continue
+        nudged=$(awk -v id="$b" '$1 == id { t = $2 } END { print t + 0 }' "$roomf" 2>/dev/null || echo 0)
+        [ $((now - ${nudged:-0})) -lt $((ROOM_EVERY_MIN * 60)) ] && continue
+        targets="$targets${targets:+,}$b"
+      done
+      if [ -n "$targets" ]; then
+        emit "ROOM room=$est_extra targets=$targets available=${free_pct}% reason=\"$reason\""
+        {
+          [ -f "$roomf" ] && awk -v t=",$targets," 'index(t, "," $1 ",") == 0' "$roomf"
+          for b in $(printf '%s' "$targets" | tr ',' ' '); do printf '%s %s\n' "$b" "$now"; done
+        } >"$roomf.tmp" && mv "$roomf.tmp" "$roomf"
+        fired=1
+      fi
     fi
     save_state
   fi

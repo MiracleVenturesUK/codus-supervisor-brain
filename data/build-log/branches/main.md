@@ -169,3 +169,32 @@ Decisions:
   written to `.git/config`.
 - Verified from a fresh public clone: 53 passed, 0 failed; `./install.sh` into a
   throwaway HOME installed both skills and seeded `config.env`.
+
+### 2026-09-18: ROOM nudges in the watcher ("push harder")
+- Request: advise mode that pushes Brains to use more quadrants, checking every
+  5 minutes instead of hourly.
+- Decision: the watcher decides when a nudge is due, not the Brain. It already
+  samples every minute at no cost; the Brain wakes only when a ROOM event is due
+  and just sends the messages. Rejected: `TICK_MIN=5` with the Brain reviewing on
+  every tick (12 LLM wakes an hour whether or not anything is due, each carrying
+  the Brain's whole context).
+- `fleet-sample.sh`: finds the agent it runs under (walks its own ppid chain to
+  the nearest agent) and reports `self` plus `active_brains` (Brains that are busy
+  or recent, excluding self). `CS_TEST_SELF_PID` for tests.
+- `fleet-watch.sh`: ROOM event in advise mode when state is ok,
+  `est_extra >= ROOM_MIN`, and a working Brain has not been nudged within
+  `ROOM_EVERY_MIN` (per-Brain times in `room.state`) and has not declined within
+  `ROOM_DECLINE_MIN` (`decline.log`). STATE events now carry `brains=` for HOLD.
+  New `--decline <id>` lets a Brain with nothing to split pause its nudges with
+  one shell command, which costs no supervisor wake.
+- New settings: `ROOM_MIN` (2), `ROOM_EVERY_MIN` (60), `ROOM_DECLINE_MIN` (60).
+  Public defaults stay conservative; the "push harder" profile (advise, cap 8,
+  reserve 20%, nudge every 5 min, decline pause 30 min) is documented in
+  `config.example.env`, the README and the skill.
+- SKILL: ROOM event row, stronger ROOM template with the decline command,
+  `brains` ownership map in `advice.json` (advise mode) for naming each Brain's
+  stopped quadrants, updated hard rule on when Brains may be messaged.
+- Tests: 13 new (self detection, active Brains, ROOM fires, per-Brain interval,
+  repeat, decline and bad id, report mode silent, no ROOM when tight or below
+  ROOM_MIN, STATE lists Brains). 66 passed, 0 failed. Live check from this Brain:
+  `self` resolved to the supervisor's own Brain id, three working Brains listed.

@@ -17,8 +17,11 @@ job), by any Brain via `codus-capacity-check`, or by hand from a terminal.
   component or Brain id, cwd, session, own and tree memory, tree CPU, uptime,
   last activity, status), top memory groups, optional plan usage, capacity
   state and room estimate.
-- `fleet-watch.sh`: sampling loop with events STATE, RECLAIM, TICK, ERROR,
-  ALREADY_RUNNING; `--once`, `--exit-on-event`, `--stop`.
+- `fleet-watch.sh`: sampling loop with events STATE, RECLAIM, ROOM (advise mode),
+  TICK, ERROR, ALREADY_RUNNING; `--once`, `--exit-on-event`, `--stop`,
+  `--decline <brain id>`.
+- Self detection: the sampler reports the agent it runs under (`self`) and the
+  Brains working right now (`active_brains`), so ROOM never targets the supervisor.
 - `lib.sh`: settings with env > config.env > default precedence.
 
 ## Data (state files, `~/.codus-supervisor`)
@@ -30,14 +33,16 @@ job), by any Brain via `codus-capacity-check`, or by hand from a terminal.
 | `history.jsonl` | watcher | capped at `HISTORY_MAX_LINES` |
 | `events.log`, `errors.log` | watcher | append-only |
 | `watch.pid`, `watch.state` | watcher | single instance; hysteresis and cooldown memory |
+| `room.state` | watcher | last ROOM nudge time per Brain |
+| `decline.log` | other Brains via `--decline` | Brains with nothing to split right now |
 
 ## Interface
 
 - `fleet-sample.sh [--summary | --kv | --out FILE]`
-- `fleet-watch.sh [--once | --exit-on-event | --stop] [--interval SEC] [--max-minutes N]`
+- `fleet-watch.sh [--once | --exit-on-event | --stop | --decline ID] [--interval SEC] [--max-minutes N]`
 - Test-only overrides: `CS_TEST_PS_FILE`, `CS_TEST_CWD_FILE`, `CS_TEST_ACTIVITY_FILE`,
   `CS_TEST_NOW`, `CS_TEST_TOTAL_MB`, `CS_TEST_PRESSURE_LEVEL`, `CS_TEST_FREE_PCT`,
-  `CS_TEST_SWAP` ("used total" in MB), `CS_TEST_COMPRESSED_MB`.
+  `CS_TEST_SWAP` ("used total" in MB), `CS_TEST_COMPRESSED_MB`, `CS_TEST_SELF_PID`.
 
 ## Key files
 
@@ -61,4 +66,5 @@ job), by any Brain via `codus-capacity-check`, or by hand from a terminal.
 
 ## Build log
 
+- 2026-09-18: ROOM nudges decided in the watcher, `--decline`, self detection. See [main](../../data/build-log/branches/main.md).
 - 2026-09-18: initial sampler, watcher, settings and tests. See [main](../../data/build-log/branches/main.md).

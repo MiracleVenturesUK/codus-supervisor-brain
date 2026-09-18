@@ -39,7 +39,8 @@ trap 'rm -rf "$work"' EXIT
 # Isolate from the caller's environment and real files.
 for k in INTERVAL_SEC TICK_MIN IDLE_MIN BUSY_MIN FREE_TIGHT_PCT FREE_CRIT_PCT RESERVE_PCT \
   SWAP_HEAVY_PCT MAX_EXTRA_AGENTS DEFAULT_AGENT_MB RECLAIM_MB RECLAIM_COOLDOWN_MIN \
-  HISTORY_MAX_LINES AGENT_BINARIES MODE COOLDOWN_MIN CODUS_SUPERVISOR_CONFIG CLAUDE_CONFIG_DIR; do
+  HISTORY_MAX_LINES AGENT_BINARIES MODE COOLDOWN_MIN ROOM_MIN ROOM_EVERY_MIN ROOM_DECLINE_MIN \
+  CODUS_SUPERVISOR_CONFIG CLAUDE_CONFIG_DIR CS_TEST_SELF_PID; do
   unset "$k"
 done
 real_home=$HOME
@@ -172,6 +173,52 @@ out=$("$W" --stop)
 case $out in "stopped watcher pid=$w1") ok "--stop ends the running watcher" ;; *) bad "--stop" "$out" ;; esac
 wait "$w1" 2>/dev/null
 [ ! -f "$H/watch.pid" ] && ok "pidfile removed on exit" || bad "pidfile removed on exit"
+
+echo "advise mode (ROOM nudges)"
+# Same fleet plus the supervisor's own Brain (250) running the watcher (251).
+cp "$work/ps" "$work/ps2"
+cat >>"$work/ps2" <<'EOF'
+  250     1  204800   0.4     01:00:00 claude --effort max --dangerously-skip-permissions
+  251   250    2048   0.0        00:10 /bin/sh /x/fleet-watch.sh --exit-on-event
+EOF
+cp "$work/cwd" "$work/cwd2"
+printf '250%s/Users/someone/.codus/brains/brain-self\n' "$tab" >>"$work/cwd2"
+cp "$work/activity" "$work/activity2"
+printf '250%s%s\n' "$tab" $((NOW - 30)) >>"$work/activity2"
+export CS_TEST_PS_FILE="$work/ps2" CS_TEST_CWD_FILE="$work/cwd2" CS_TEST_ACTIVITY_FILE="$work/activity2" CS_TEST_SELF_PID=251
+
+kv=$("$S/fleet-sample.sh" --kv)
+check "sampler knows which Brain it runs under" "brain-self" "$(printf '%s\n' "$kv" | sed -n 's/^self=//p')"
+check "working Brains exclude idle ones and the supervisor itself" "main" "$(printf '%s\n' "$kv" | sed -n 's/^active_brains=//p')"
+
+reset_state last_state=ok
+out=$(MODE=advise run_to 20 "$W" --exit-on-event --interval 1 --max-seconds 15)
+case $out in *" ROOM room=4 targets=main "*) ok "ROOM nudges the working Brain when there is room" ;; *) bad "ROOM fires" "$out" ;; esac
+check "nudge time remembered" main "$(awk '{ print $1 }' "$H/room.state")"
+out=$(MODE=advise run_to 20 "$W" --exit-on-event --interval 1 --max-seconds 2)
+case $out in *ROOM*) bad "ROOM waits ROOM_EVERY_MIN before nudging again" "$out" ;; *) ok "ROOM waits ROOM_EVERY_MIN before nudging again" ;; esac
+out=$(MODE=advise ROOM_EVERY_MIN=0 run_to 20 "$W" --exit-on-event --interval 1 --max-seconds 15)
+case $out in *" ROOM room=4 targets=main "*) ok "ROOM repeats once the interval passes" ;; *) bad "ROOM repeats" "$out" ;; esac
+out=$("$W" --decline main)
+case $out in "ok: no ROOM nudges for main for 60 minutes") ok "--decline records the Brain" ;; *) bad "--decline" "$out" ;; esac
+out=$(MODE=advise ROOM_EVERY_MIN=0 run_to 20 "$W" --exit-on-event --interval 1 --max-seconds 2)
+case $out in *ROOM*) bad "a Brain that declined is skipped" "$out" ;; *) ok "a Brain that declined is skipped" ;; esac
+if "$W" --decline 'not an id!' >/dev/null 2>&1; then bad "--decline rejects a bad id"; else ok "--decline rejects a bad id"; fi
+
+reset_state last_state=ok
+out=$(ROOM_EVERY_MIN=0 run_to 20 "$W" --exit-on-event --interval 1 --max-seconds 2)
+case $out in *ROOM*) bad "report mode never nudges" "$out" ;; *) ok "report mode never nudges" ;; esac
+reset_state last_state=tight
+out=$(MODE=advise ROOM_EVERY_MIN=0 CS_TEST_PRESSURE_LEVEL=2 run_to 20 "$W" --exit-on-event --interval 1 --max-seconds 2)
+case $out in *ROOM*) bad "no ROOM while memory is tight" "$out" ;; *) ok "no ROOM while memory is tight" ;; esac
+reset_state last_state=ok
+out=$(MODE=advise ROOM_MIN=5 ROOM_EVERY_MIN=0 run_to 20 "$W" --exit-on-event --interval 1 --max-seconds 2)
+case $out in *ROOM*) bad "no ROOM below ROOM_MIN" "$out" ;; *) ok "no ROOM below ROOM_MIN" ;; esac
+reset_state last_state=ok
+out=$(CS_TEST_PRESSURE_LEVEL=4 run_to 20 "$W" --exit-on-event --interval 1 --max-seconds 15)
+case $out in *" STATE ok->critical "*" brains=main "*) ok "STATE lists the working Brains for HOLD" ;; *) bad "STATE brains=" "$out" ;; esac
+export CS_TEST_PS_FILE="$work/ps" CS_TEST_CWD_FILE="$work/cwd" CS_TEST_ACTIVITY_FILE="$work/activity"
+unset CS_TEST_SELF_PID
 
 echo "installer"
 dest=$work/skills

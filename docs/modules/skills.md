@@ -16,8 +16,9 @@ re-invoke it). The capacity check works in any Brain that can read a file.
 
 - Supervisor: start (reading, full review, background watcher), event handling
   (STATE / RECLAIM / TICK / ERROR / ALREADY_RUNNING), light and full reviews,
-  `advice.json`, report mode (default), advise mode (HOLD / ALLCLEAR / ROOM to
-  active Brains by id, per-Brain cooldown), stop, mode changes.
+  `advice.json`, report mode (default), advise mode (HOLD / ALLCLEAR on capacity
+  changes; ROOM when the watcher says a nudge is due, with a decline command in
+  the message), stop, mode changes, and a documented "push harder" profile.
 - Capacity check: snapshot first, live reading if stale, advice if fresh;
   critical = start nothing, tight = no new lanes, ok = up to the room estimate.
 
@@ -46,11 +47,13 @@ snapshot.
 
 - Brain names can repeat; always address Brains by id.
 - A message to a Brain lands in its terminal as a turn, so advise mode only
-  messages active Brains, only on change, with a cooldown.
+  messages working Brains: HOLD / ALLCLEAR on a change, ROOM at the configured
+  cadence, and a Brain with nothing to split can pause ROOM with `--decline`.
 - Watcher wakes are automated turns: no user bubble, and chat only when there
   is news.
 - Examples must use made-up project names (public repo).
 
 ## Build log
 
+- 2026-09-18: ROOM driven by watcher events, stronger ROOM template, push-harder profile. See [main](../../data/build-log/branches/main.md).
 - 2026-09-18: initial supervisor and capacity-check skills. See [main](../../data/build-log/branches/main.md).

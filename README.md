@@ -28,13 +28,15 @@ tight, and points out which idle agents are holding memory.
   belongs to, its folder, memory (including anything it started, such as tests
   or dev servers), CPU, and when it last did anything.
 - **Wakes the Brain only on events:** a capacity change (ok, tight or critical),
-  a reclaim hint (idle agents holding memory while it is short), or an hourly
-  tick.
+  a reclaim hint (idle agents holding memory while it is short), a ROOM nudge
+  that is due (advise mode), or an hourly tick.
 - **Reports** to you in one or two sentences in Brain Chat, only when something
   changed.
 - **Advises** (opt-in) your other Brains: HOLD when memory gets tight, ALL CLEAR
-  when it recovers, and ROOM when an active Brain could spread work across more
-  quadrants.
+  when it recovers, and ROOM when there is memory for more agents. ROOM nudges
+  go to Brains that are working right now and repeat every `ROOM_EVERY_MIN`
+  minutes while the room lasts. A Brain with nothing to split runs one command
+  to pause its nudges.
 - **Spots problems:** a quadrant whose agent is working in a different folder from
   the one it is pinned to, agents with no quadrant, Brains with duplicate names,
   plan accounts near their limit.
@@ -113,15 +115,24 @@ win over the file.
 | `SWAP_HEAVY_PCT` | 25 | swap above this share of RAM halves the room estimate |
 | `MAX_EXTRA_AGENTS` | 4 | never suggest more new agents than this at once |
 | `RECLAIM_MB` | 1024 | idle agents holding this much while memory is short = reclaim hint |
-| `COOLDOWN_MIN` | 60 | minutes between messages to the same Brain |
+| `COOLDOWN_MIN` | 60 | minutes between HOLD / ALL CLEAR messages to the same Brain |
+| `ROOM_MIN` | 2 | nudge only when at least this many more agents fit |
+| `ROOM_EVERY_MIN` | 60 | minutes between ROOM nudges to the same Brain |
+| `ROOM_DECLINE_MIN` | 60 | how long a Brain's "nothing to split" pauses its nudges |
 | `AGENT_BINARIES` | `claude codex` | process names that count as agents |
+
+**Push harder.** To have Brains use every quadrant memory allows, set
+`MODE=advise`, `MAX_EXTRA_AGENTS=8`, `RESERVE_PCT=20`, `ROOM_EVERY_MIN=5` and
+`ROOM_DECLINE_MIN=30`. The monitor still checks every minute; working Brains are
+nudged every 5 minutes while there's room. Each nudge is a turn for the Brain
+that receives it, so it uses plan usage.
 
 ## How it works
 
 ```
 fleet-watch.sh  (background job in the supervisor Brain, no tokens)
    │  every 60 s: fleet-sample.sh → snapshot.json + history.jsonl
-   │  exits on STATE / RECLAIM / TICK
+   │  exits on STATE / RECLAIM / ROOM / TICK
    ▼
 supervisor Brain wakes
    │  reads snapshot.json, lists quadrants and Brains
@@ -147,7 +158,7 @@ any Brain about to fan out
 
 Files in `~/.codus-supervisor`: `config.env`, `snapshot.json`,
 `history.jsonl`, `events.log`, `advice.json`, `sent.log`, `reported.log`,
-`watch.pid`, `watch.state`.
+`room.state`, `decline.log`, `watch.pid`, `watch.state`.
 
 ## Cost
 
@@ -181,7 +192,7 @@ Most of this belongs inside codus itself:
 ## Development
 
 ```sh
-sh tests/run.sh      # 53 offline checks plus one live read-only snapshot
+sh tests/run.sh      # 65 offline checks plus one live read-only snapshot
 ```
 
 - `skills/codus-supervisor/scripts/`: `lib.sh` (settings), `fleet-sample.sh`,
