@@ -55,5 +55,6 @@ snapshot.
 
 ## Build log
 
+- 2026-09-18: queued (tab closed) nudges pause that Brain via `--decline`. See [main](../../data/build-log/branches/main.md).
 - 2026-09-18: ROOM driven by watcher events, stronger ROOM template, push-harder profile. See [main](../../data/build-log/branches/main.md).
 - 2026-09-18: initial supervisor and capacity-check skills. See [main](../../data/build-log/branches/main.md).

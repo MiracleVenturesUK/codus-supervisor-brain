@@ -210,3 +210,12 @@ Decisions:
   mid-sleep when stopped; new checks that `--stop` returns within 5 s and that a
   restart straight after it works. 68 passed, 0 failed.
 - SKILL: Brain ownership subtracts `excluded` quadrant ids.
+
+### 2026-09-18: queued nudges pause the Brain
+- Found live on the first ROOM round: two of three target Brains had their tab
+  closed, so `brain_send_to_brain` queued the nudge in their inbox. With 5-minute
+  nudges, repeats would pile up there and be read all at once.
+- Rule (SKILL): when a send is queued, the supervisor runs `--decline <id>` for
+  that Brain (reusing the decline pause, 30 min in the push profile) and logs
+  `queued` or `delivered` in `sent.log`. Rejected: a separate queued-state file;
+  the decline pause already does the job and needs no new code.

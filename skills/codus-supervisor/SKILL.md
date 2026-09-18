@@ -35,7 +35,7 @@ State folder: `~/.codus-supervisor` (or `$CODUS_SUPERVISOR_HOME`).
 | `history.jsonl` | watcher | one compact line per sample (48 h) |
 | `events.log` | watcher | every event line |
 | `advice.json` | you, each full review | what other Brains should do now (schema below) |
-| `sent.log` | you | `<utc time> <brain id> <HOLD/ALLCLEAR/ROOM>` per message sent |
+| `sent.log` | you | `<utc time> <brain id> <HOLD/ALLCLEAR/ROOM> <delivered|queued>` per message sent |
 | `reported.log` | you | `<utc time> <key>` per problem already reported to the user |
 | `room.state` | watcher | when each Brain was last nudged with ROOM |
 | `decline.log` | other Brains, via `--decline` | Brains that had nothing to split |
@@ -180,7 +180,12 @@ Messages must stand alone (the other Brain has none of your context):
 Use the real skill folder path in the decline command (the other Brain can
 run it as is), and the real numbers from `config.env`.
 
-Append `<utc time> <brain id> <KIND>` to `sent.log` for each message.
+If `brain_send_to_brain` says the message was **queued** (that Brain's tab
+isn't open), run `"$S/scripts/fleet-watch.sh" --decline <that id>` yourself.
+Otherwise repeats pile up in its inbox and it reads them all at once.
+
+Append `<utc time> <brain id> <KIND> <delivered|queued>` to `sent.log` for
+each message.
 
 ## Another watcher
 
