@@ -163,16 +163,22 @@ out=$(CS_TEST_PRESSURE_LEVEL=2 RECLAIM_MB=100 run_to 20 "$W" --exit-on-event --i
 case $out in *RECLAIM*) bad "RECLAIM cooldown holds across restarts" "$out" ;; *) ok "RECLAIM cooldown holds across restarts" ;; esac
 
 reset_state
-"$W" --interval 1 >"$work/w1.out" 2>&1 &
+# A long interval, so the watcher is mid-sleep when it is told to stop.
+"$W" --interval 30 >"$work/w1.out" 2>&1 &
 w1=$!
 i=0
 while [ ! -f "$H/watch.pid" ] && [ $i -lt 50 ]; do sleep 0.1; i=$((i + 1)); done
+sleep 1
 out=$(run_to 10 "$W" --exit-on-event --interval 1 --max-seconds 5)
 case $out in *ALREADY_RUNNING*) ok "a second watcher refuses to start" ;; *) bad "second watcher refuses" "$out" ;; esac
-out=$("$W" --stop)
+t0=$(date +%s)
+out=$(run_to 15 "$W" --stop)
 case $out in "stopped watcher pid=$w1") ok "--stop ends the running watcher" ;; *) bad "--stop" "$out" ;; esac
-wait "$w1" 2>/dev/null
+[ $(($(date +%s) - t0)) -le 5 ] && ok "--stop does not wait out the sleep" || bad "--stop does not wait out the sleep"
 [ ! -f "$H/watch.pid" ] && ok "pidfile removed on exit" || bad "pidfile removed on exit"
+out=$(run_to 20 "$W" --exit-on-event --interval 1 --max-seconds 2)
+case $out in *ALREADY_RUNNING*) bad "a restart straight after --stop works" "$out" ;; *" TICK "*) ok "a restart straight after --stop works" ;; *) bad "restart after --stop" "$out" ;; esac
+wait "$w1" 2>/dev/null
 
 echo "advise mode (ROOM nudges)"
 # Same fleet plus the supervisor's own Brain (250) running the watcher (251).

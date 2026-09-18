@@ -198,3 +198,15 @@ Decisions:
   repeat, decline and bad id, report mode silent, no ROOM when tight or below
   ROOM_MIN, STATE lists Brains). 66 passed, 0 failed. Live check from this Brain:
   `self` resolved to the supervisor's own Brain id, three working Brains listed.
+
+### 2026-09-18: fix `--stop` racing a restart
+- Found live: `--stop` printed "stopped" while the old watcher was still alive
+  inside `sleep 60`, because a POSIX shell runs a trapped signal only after the
+  foreground command finishes. A restart straight after it hit ALREADY_RUNNING.
+- Fix: the loop sleeps in the background and `wait`s on it (a signal interrupts
+  `wait` at once), the INT/TERM/HUP trap kills that sleep, and `--stop` polls
+  until the process is gone (up to 10 s, non-zero exit if it is not).
+- Tests: the single-instance test now uses a 30 s interval so the watcher is
+  mid-sleep when stopped; new checks that `--stop` returns within 5 s and that a
+  restart straight after it works. 68 passed, 0 failed.
+- SKILL: Brain ownership subtracts `excluded` quadrant ids.

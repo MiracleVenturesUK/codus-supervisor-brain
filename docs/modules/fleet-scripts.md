@@ -63,8 +63,11 @@ job), by any Brain via `codus-capacity-check`, or by hand from a terminal.
   `--exit-on-event` mode, so config changes apply from the next wake.
 - In tests, a watchdog inside `$( )` must redirect its output or the
   substitution blocks until the watchdog's `sleep` ends.
+- A shell runs a trapped signal only after the foreground command ends, so the
+  watcher sleeps with `sleep & wait`; `--stop` also polls until the pid is gone.
 
 ## Build log
 
+- 2026-09-18: `--stop` waits for the watcher to exit; the sleep no longer delays signals. See [main](../../data/build-log/branches/main.md).
 - 2026-09-18: ROOM nudges decided in the watcher, `--decline`, self detection. See [main](../../data/build-log/branches/main.md).
 - 2026-09-18: initial sampler, watcher, settings and tests. See [main](../../data/build-log/branches/main.md).

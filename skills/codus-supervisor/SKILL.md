@@ -106,8 +106,8 @@ in `advice.json` and nothing new stands out, post nothing.
    - **Idle agents:** `status` idle, largest `tree_mb` first.
    - **Usage:** any `usage` account limit at 90% or more.
    - In advise mode only, **Brain ownership:** `brain_get_project(brain_id)` for
-     each live Brain; linked plus delegated component ids are its quadrants.
-     Keep the stopped ones per Brain, for ROOM messages.
+     each live Brain; linked plus delegated component ids, minus excluded ones,
+     are its quadrants. Keep the stopped ones per Brain, for ROOM messages.
 5. Write `advice.json`:
    ```json
    {

@@ -81,7 +81,15 @@ watcher_pid() {
 
 if [ "$stop" = 1 ]; then
   if wp=$(watcher_pid); then
-    kill "$wp" && echo "stopped watcher pid=$wp"
+    kill "$wp" 2>/dev/null
+    # Wait until it is really gone, so a restart right after this cannot race it.
+    i=0
+    while kill -0 "$wp" 2>/dev/null && [ "$i" -lt 50 ]; do sleep 0.2; i=$((i + 1)); done
+    if kill -0 "$wp" 2>/dev/null; then
+      echo "watcher pid=$wp did not stop within 10 seconds" >&2
+      exit 1
+    fi
+    echo "stopped watcher pid=$wp"
   else
     echo "no watcher running for $CS_HOME"
   fi
@@ -94,8 +102,11 @@ if [ "$once" = 0 ]; then
     exit 0
   fi
   echo $$ >"$pidf"
+  sleep_pid=
   trap 'rm -f "$pidf"' EXIT
-  trap 'exit 0' INT TERM HUP
+  # A trapped signal waits for a foreground command to finish, so the loop
+  # sleeps in the background and waits on it; this kills that sleep too.
+  trap '[ -n "$sleep_pid" ] && kill "$sleep_pid" 2>/dev/null; exit 0' INT TERM HUP
 fi
 
 # ---- remembered state (survives restarts, so hysteresis and cooldowns hold) --
@@ -235,5 +246,8 @@ EOF
     emit "TICK ${summary:-no reading}"
     exit 0
   fi
-  sleep "$INTERVAL_SEC"
+  sleep "$INTERVAL_SEC" &
+  sleep_pid=$!
+  wait "$sleep_pid" 2>/dev/null
+  sleep_pid=
 done
