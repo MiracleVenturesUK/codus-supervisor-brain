@@ -92,6 +92,11 @@ at least `ROOM_MIN` more agents fit, a Brain is busy or recent, it was not
 nudged in the last `ROOM_EVERY_MIN` minutes and has not declined in the last
 `ROOM_DECLINE_MIN`). It never lists you as a target. You only send.
 
+At any wake, if `advice.json` `brains` is older than 30 minutes, refresh it
+(`brain_list_brains`, then `brain_get_project` for each live Brain) before
+handling the events. A stale map means a closed Brain's newer quadrants are
+missed.
+
 Then **always restart the watcher** (same background command) before ending
 the turn, unless the user asked you to stop.
 
@@ -119,7 +124,10 @@ in `advice.json` and nothing new stands out, post nothing.
    - **Brain ownership:** `brain_get_project(brain_id)` for each live Brain;
      linked plus delegated component ids, minus excluded ones, are its
      quadrants. Keep them per Brain (DONE and closed-Brain handling need them),
-     with the stopped ones marked for ROOM messages.
+     with the stopped ones marked for ROOM messages. codus forgets a Brain's
+     project the moment it closes (`brain_get_project` then fails and the Brain
+     drops out of `brain_list_brains`), so this map is the only record of what
+     a closed Brain used.
 5. Write `advice.json`:
    ```json
    {
@@ -232,10 +240,12 @@ that owns the quadrant knows whether its work is finished.
 two samples in a row.
 
 1. `brain_list_brains`: if it is live again (a restart), ignore the event.
-2. `brain_get_project(<closed id>)`: its quadrants are linked plus delegated,
-   minus excluded.
-3. Drop any quadrant that another live Brain owns (check their projects, not
-   excluded there). Those are still in use.
+2. Its quadrants: `advice.json` `brains[<closed id>].owned`. Do not call
+   `brain_get_project` for it; codus has already forgotten a closed Brain's
+   project. If the map has no entry for it, tell the user you can't tell which
+   quadrants it used, and stop.
+3. Drop any quadrant that another live Brain owns (refresh their projects now;
+   a quadrant excluded there is not theirs). Those are still in use.
 4. For each remaining quadrant, look at its agent in `snapshot.json` and its
    aux services with `brain_quadrant_status`:
    - **Agent busy or recent:** leave it alone; its work may still be running.

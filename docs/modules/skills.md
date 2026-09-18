@@ -58,9 +58,12 @@ snapshot.
 - Watcher wakes are automated turns: no user bubble, and chat only when there
   is news.
 - Examples must use made-up project names (public repo).
+- codus forgets a Brain's project when it closes (`brain_get_project` fails), so
+  closed-Brain cleanup relies on the ownership cached in `advice.json`.
 
 ## Build log
 
+- 2026-09-18: closed Brains read cached ownership (codus forgets their projects). See [main](../../data/build-log/branches/main.md).
 - 2026-09-18: DONE nudges and closed-Brain cleanup (`ON_BRAIN_CLOSE`). See [main](../../data/build-log/branches/main.md).
 - 2026-09-18: queued (tab closed) nudges pause that Brain via `--decline`. See [main](../../data/build-log/branches/main.md).
 - 2026-09-18: ROOM driven by watcher events, stronger ROOM template, push-harder profile. See [main](../../data/build-log/branches/main.md).

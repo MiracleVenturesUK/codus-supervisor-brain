@@ -257,3 +257,17 @@ Decisions:
 - Tests: 9 new (brains_live, BRAIN_CLOSED after two misses, not after one,
   marker cleared, idle_quadrants format, DONE fires, DONE cooldown,
   ON_BRAIN_CLOSE validation). 77 passed, 0 failed.
+
+### 2026-09-18: closed Brains are forgotten by codus
+- Found live on the first cleanup: two Brains closed, and both vanished from
+  `brain_list_brains`; `brain_get_project(<closed id>)` returns "No Brain has that
+  ID". The closed-Brain procedure's ownership lookup therefore cannot work after
+  the fact.
+- Fix (SKILL): the ownership map in `advice.json` (`brains[id].owned`) is the
+  record of what a Brain used. It is refreshed at every wake when older than 30
+  minutes, and BRAIN_CLOSED reads it instead of calling `brain_get_project`. No
+  entry means the supervisor says it can't tell and leaves things alone.
+- First real cleanup, using the ownership recorded earlier in the session: both
+  quadrants had stopped agents and idle aux services, so they were unpinned and
+  logged in `freed.log` with their old folders. A Brain that closed before
+  tracking started had no recorded ownership, so its quadrants were left alone.
