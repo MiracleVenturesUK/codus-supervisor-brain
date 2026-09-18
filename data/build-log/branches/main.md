@@ -160,3 +160,12 @@ Decisions:
 - SKILL: added "Change mode or thresholds" (edit `config.env` only when asked;
   sampler rereads it every sample, watcher timings apply from its next restart).
 - MIT licence, copyright MiracleVenturesUK.
+
+### 2026-09-18: published
+- Public repo: https://github.com/MiracleVenturesUK/codus-supervisor-brain
+  (topics: codus, claude-code, ai-agents, macos, developer-tools).
+- Pushed with the owning account's token through a one-off git credential
+  helper, so the machine's active gh account was not switched and no token was
+  written to `.git/config`.
+- Verified from a fresh public clone: 53 passed, 0 failed; `./install.sh` into a
+  throwaway HOME installed both skills and seeded `config.env`.
