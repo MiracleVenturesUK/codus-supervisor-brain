@@ -279,3 +279,25 @@ Decisions:
 - SKILL: never invent a user message; routine results stay in the terminal;
   anything the user would act on now goes out as a one-line `PushNotification`
   (proactive). Reported to codus as a bug.
+
+### 2026-09-18: ROOM prefers the earliest tab
+- Request: keep active quadrants on the front tabs rather than letting Brains
+  spread onto new ones. Seen live: two working Brains each opened a brand new
+  tab for fresh work instead of reusing any of the many already-stopped
+  quadrants sitting in tabs 1 to 3.
+- Decision: this is a documentation change, not a shell one. `stopped_quadrants`
+  was already emitted in the order `brain_list_all_quadrants` returns it (tab
+  order, earliest first) since the ownership rework, but nothing said a
+  receiving Brain should prefer the FRONT of that list, and the ROOM template's
+  fallback ("repin a stopped quadrant... or open a new git worktree") did not
+  rank the two options. Rejected: having the supervisor pick and name a specific
+  quadrant itself, which would need per-Brain suitability judgement (does this
+  quadrant's folder fit the Brain's queued work) that only the receiving Brain
+  can make.
+- SKILL: "Stopped quadrants" now states the tab-order guarantee explicitly and
+  says to reuse the earliest one before opening a new tab; the `advice.json`
+  schema note says the same; the ROOM template gained one sentence: prefer a
+  stopped quadrant in the earliest tab that has one over opening a new tab.
+- Tests: shell fixtures can't exercise Brain-side prose, so this is a
+  source-text-contract check instead (grep for the two new sentences), the same
+  shape used for the SKILL-wording-only entry above. 2 new, 79 passed, 0 failed.

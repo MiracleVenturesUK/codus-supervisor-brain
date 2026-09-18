@@ -120,7 +120,10 @@ in `advice.json` and nothing new stands out, post nothing.
 3. `brain_list_brains`: which Brains are live, their ids, and which one is you.
 4. Work out:
    - **Stopped quadrants:** quadrant ids with no `agent_list` entry whose
-     `component_id` matches.
+     `component_id` matches, kept in tab order (earliest tab first) — the
+     order `brain_list_all_quadrants` already returns them in. A Brain
+     filling capacity should reuse the earliest one on this list before
+     opening a new tab, so active work stays on the front tabs.
    - **Pin mismatch:** a quadrant agent whose `cwd` differs from its pinned
      folder. Work sent to that quadrant lands in the wrong project, so the user
      needs to hear about it.
@@ -152,6 +155,8 @@ in `advice.json` and nothing new stands out, post nothing.
    `advice` is `hold` when state is tight or critical, `room` when state is ok
    and `est_extra_agents` is 2 or more, otherwise `steady`.
    `max_new_agents` = `est_extra_agents` (0 unless ok).
+   `stopped_quadrants` keeps tab order (earliest tab first), so a ROOM message
+   can point a Brain at the front of the queue rather than the back.
 6. Report, and advise if `MODE=advise`.
 
 ### Report (both modes)
@@ -196,8 +201,10 @@ Messages must stand alone (the other Brain has none of your context):
 > about <n> more agents right now, so use it. If you have independent work
 > queued (other features, fixes, tests, reviews, research), spread it across
 > more quadrants now: <your stopped quadrants from advice.json, or: repin a
-> stopped quadrant to a new git worktree, one folder per quadrant>. Keep each
-> task with one owner rather than splitting one task across agents. If you
+> stopped quadrant to a new git worktree, one folder per quadrant>. Prefer a
+> stopped quadrant in the earliest tab that has one over opening a new tab, so
+> active work stays on the front tabs rather than spreading to the back. Keep
+> each task with one owner rather than splitting one task across agents. If you
 > have nothing independent to split right now, run
 > `<skill folder>/scripts/fleet-watch.sh --decline <their id>` and I'll stop
 > nudging you for <ROOM_DECLINE_MIN> minutes. I check again every
