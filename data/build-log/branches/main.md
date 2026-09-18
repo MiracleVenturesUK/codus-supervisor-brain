@@ -271,3 +271,11 @@ Decisions:
   quadrants had stopped agents and idle aux services, so they were unpinned and
   logged in `freed.log` with their old folders. A Brain that closed before
   tracking started had no recorded ownership, so its quadrants were left alone.
+
+### 2026-09-18: reports on automated wakes
+- Found live: on a turn started by the watcher's exit, codus refuses `chat_say`
+  without a `user_message` ("no Codus origin tag"), and there is no human message
+  to use. Faking one is not acceptable, so these reports cannot reach Chat.
+- SKILL: never invent a user message; routine results stay in the terminal;
+  anything the user would act on now goes out as a one-line `PushNotification`
+  (proactive). Reported to codus as a bug.

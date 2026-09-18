@@ -63,6 +63,7 @@ snapshot.
 
 ## Build log
 
+- 2026-09-18: automated wakes use PushNotification when Chat refuses the post. See [main](../../data/build-log/branches/main.md).
 - 2026-09-18: closed Brains read cached ownership (codus forgets their projects). See [main](../../data/build-log/branches/main.md).
 - 2026-09-18: DONE nudges and closed-Brain cleanup (`ON_BRAIN_CLOSE`). See [main](../../data/build-log/branches/main.md).
 - 2026-09-18: queued (tab closed) nudges pause that Brain via `--decline`. See [main](../../data/build-log/branches/main.md).

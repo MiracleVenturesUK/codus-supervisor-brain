@@ -76,6 +76,13 @@ emit several; handle each). This is an automated turn: follow your usual
 turn protocol (inbox first), but do not add a user bubble, and post to chat
 only if there is something the user should know.
 
+codus may refuse `chat_say` on these turns because it wants a user message,
+and there is none. Never invent one. Put routine results in your terminal
+reply. For things the user would act on now (memory tight or critical, a
+RECLAIM list, a closed Brain's quadrants freed or left for them to close),
+send a `PushNotification` (status `proactive`, one line under 200
+characters) instead. Routine nudges never get a notification.
+
 | Event | Do |
 |---|---|
 | `STATE a->b` | full review, then report/advise (`brains=` lists the Brains working right now) |
