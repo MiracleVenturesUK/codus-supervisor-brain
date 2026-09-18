@@ -248,6 +248,22 @@ check "ON_BRAIN_CLOSE only accepts free or report" "report free" "$(ON_BRAIN_CLO
 export CS_TEST_PS_FILE="$work/ps" CS_TEST_CWD_FILE="$work/cwd" CS_TEST_ACTIVITY_FILE="$work/activity"
 unset CS_TEST_SELF_PID
 
+echo "skill content"
+# The ROOM message and the stopped-quadrants ordering are prose in SKILL.md, not
+# shell logic, so the only check available is that the documented behaviour is
+# actually there: reusing the earliest tab before opening a new one.
+skill="$root/skills/codus-supervisor/SKILL.md"
+if grep -q 'kept in tab order (earliest tab first)' "$skill"; then
+  ok "stopped quadrants are documented as tab-ordered"
+else
+  bad "stopped quadrants tab-order documentation"
+fi
+if grep -q 'Prefer a$' "$skill" && grep -q 'stopped quadrant in the earliest tab that has one over opening a new tab' "$skill"; then
+  ok "ROOM message tells a Brain to prefer the earliest tab"
+else
+  bad "ROOM message earliest-tab instruction"
+fi
+
 echo "installer"
 dest=$work/skills
 if "$root/install.sh" --dest "$dest" >/dev/null 2>&1; then ok "install"; else bad "install"; fi
