@@ -62,7 +62,7 @@ when the skill loaded, normally `~/.claude/skills/codus-supervisor`).
 
 ## When the watcher exits
 
-Each exit re-invokes you with its last line: `STATE`, `RECLAIM`, `TICK`,
+Each exit re-invokes you with its last line: `STATE`, `RECLAIM`, `ROOM`, `TICK`,
 `ERROR` or `ALREADY_RUNNING`. This is an automated turn: follow your usual
 turn protocol (inbox first), but do not add a user bubble, and post to chat
 only if there is something the user should know.

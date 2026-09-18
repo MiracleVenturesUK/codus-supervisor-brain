@@ -219,3 +219,6 @@ Decisions:
   that Brain (reusing the decline pause, 30 min in the push profile) and logs
   `queued` or `delivered` in `sent.log`. Rejected: a separate queued-state file;
   the decline pause already does the job and needs no new code.
+
+### 2026-09-18: SKILL wording
+- "When the watcher exits" now lists ROOM among the events that wake the Brain.
