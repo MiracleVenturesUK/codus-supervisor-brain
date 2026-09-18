@@ -8,6 +8,9 @@
 #   ROOM     advise mode only: memory is ok, at least ROOM_MIN more agents fit,
 #            and working Brains are due a nudge (every ROOM_EVERY_MIN minutes
 #            each, skipping any that declined in the last ROOM_DECLINE_MIN)
+#   DONE     quadrant agents have gone idle (finished?), listed as
+#            id:MB:idle-minutes; each quadrant at most once per DONE_EVERY_MIN
+#   BRAIN_CLOSED  a Brain that was running has been gone for two samples
 #   TICK     TICK_MIN minutes passed (periodic review)
 #   ERROR    the sampler failed three times in a row
 #   ALREADY_RUNNING  another watcher owns this state folder
@@ -56,6 +59,7 @@ pidf=$CS_HOME/watch.pid
 statef=$CS_HOME/watch.state
 roomf=$CS_HOME/room.state
 declf=$CS_HOME/decline.log
+donef=$CS_HOME/done.state
 
 if [ -n "$decline_id" ]; then
   case $decline_id in *[!A-Za-z0-9_-]*) echo "fleet-watch.sh: not a Brain id: $decline_id" >&2; exit 2 ;; esac
@@ -114,6 +118,9 @@ last_state=
 pending_state=
 pending_count=0
 last_reclaim=0
+brains_seen=
+brains_missing=
+brains_known=0
 if [ -f "$statef" ]; then
   while IFS='=' read -r k v; do
     case $k in
@@ -121,6 +128,8 @@ if [ -f "$statef" ]; then
       pending_state) pending_state=$v ;;
       pending_count) pending_count=$v ;;
       last_reclaim) last_reclaim=$v ;;
+      brains_seen) brains_seen=$v; brains_known=1 ;;
+      brains_missing) brains_missing=$v ;;
     esac
   done <"$statef"
 fi
@@ -128,9 +137,17 @@ case $pending_count in '' | *[!0-9]*) pending_count=0 ;; esac
 case $last_reclaim in '' | *[!0-9]*) last_reclaim=0 ;; esac
 
 save_state() {
-  printf 'last_state=%s\npending_state=%s\npending_count=%s\nlast_reclaim=%s\n' \
-    "$last_state" "$pending_state" "$pending_count" "$last_reclaim" >"$statef.tmp" &&
-    mv "$statef.tmp" "$statef"
+  printf 'last_state=%s\npending_state=%s\npending_count=%s\nlast_reclaim=%s\nbrains_seen=%s\nbrains_missing=%s\n' \
+    "$last_state" "$pending_state" "$pending_count" "$last_reclaim" "$brains_seen" "$brains_missing" \
+    >"$statef.tmp" && mv "$statef.tmp" "$statef"
+}
+
+# stamp_ids FILE "id,id,..." NOW: record NOW as the last time for each id.
+stamp_ids() {
+  {
+    [ -f "$1" ] && awk -v t=",$2," 'index(t, "," $1 ",") == 0' "$1"
+    for sid in $(printf '%s' "$2" | tr ',' ' '); do printf '%s %s\n' "$sid" "$3"; done
+  } >"$1.tmp" && mv "$1.tmp" "$1"
 }
 
 started=$(date +%s)
@@ -152,7 +169,7 @@ while :; do
   else
     fails=0
     mv "$snap_tmp" "$snap"
-    state= pressure= free_pct= swap_used_mb= swap_total_mb= agents= busy= idle= idle_mb= est_extra= reason= idle_list= summary= active_brains=
+    state= pressure= free_pct= swap_used_mb= swap_total_mb= agents= busy= idle= idle_mb= est_extra= reason= idle_list= summary= active_brains= brains_live= idle_quadrants=
     while IFS= read -r line; do
       v=${line#*=}
       case $line in
@@ -169,6 +186,8 @@ while :; do
         reason=*) reason=$v ;;
         idle_list=*) idle_list=$v ;;
         active_brains=*) active_brains=$v ;;
+        brains_live=*) brains_live=$v ;;
+        idle_quadrants=*) idle_quadrants=$v ;;
         summary=*) summary=$v ;;
       esac
     done <<EOF
@@ -231,13 +250,50 @@ EOF
       done
       if [ -n "$targets" ]; then
         emit "ROOM room=$est_extra targets=$targets available=${free_pct}% reason=\"$reason\""
-        {
-          [ -f "$roomf" ] && awk -v t=",$targets," 'index(t, "," $1 ",") == 0' "$roomf"
-          for b in $(printf '%s' "$targets" | tr ',' ' '); do printf '%s %s\n' "$b" "$now"; done
-        } >"$roomf.tmp" && mv "$roomf.tmp" "$roomf"
+        stamp_ids "$roomf" "$targets" "$now"
         fired=1
       fi
     fi
+
+    # Quadrant agents gone idle: probably finished. Each at most every DONE_EVERY_MIN.
+    if [ -n "$idle_quadrants" ]; then
+      due=
+      due_ids=
+      for q in $(printf '%s' "$idle_quadrants" | tr ',' ' '); do
+        qid=${q%%:*}
+        stamped=$(awk -v id="$qid" '$1 == id { t = $2 } END { print t + 0 }' "$donef" 2>/dev/null || echo 0)
+        [ $((now - ${stamped:-0})) -lt $((DONE_EVERY_MIN * 60)) ] && continue
+        due="$due${due:+,}$q"
+        due_ids="$due_ids${due_ids:+,}$qid"
+      done
+      if [ -n "$due" ]; then
+        emit "DONE quadrants=$due (id:MB:idle-minutes)"
+        stamp_ids "$donef" "$due_ids" "$now"
+        fired=1
+      fi
+    fi
+
+    # Brains that were running and are gone for a second sample in a row.
+    # (One missed sample is allowed for a restart or provider switch.)
+    if [ "$brains_known" = 1 ]; then
+      closed=
+      missing_now=
+      for b in $(printf '%s' "$brains_seen" | tr ',' ' '); do
+        case ",$brains_live," in *",$b,"*) continue ;; esac
+        case ",$brains_missing," in
+          *",$b,"*) closed="$closed${closed:+,}$b" ;;
+          *) missing_now="$missing_now${missing_now:+,}$b" ;;
+        esac
+      done
+      brains_missing=$missing_now
+      if [ -n "$closed" ]; then
+        emit "BRAIN_CLOSED brains=$closed"
+        fired=1
+      fi
+    fi
+    brains_seen=$brains_live
+    [ -n "$brains_missing" ] && brains_seen="$brains_seen${brains_seen:+,}$brains_missing"
+    brains_known=1
     save_state
   fi
 

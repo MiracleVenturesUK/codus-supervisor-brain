@@ -29,7 +29,8 @@ tight, and points out which idle agents are holding memory.
   or dev servers), CPU, and when it last did anything.
 - **Wakes the Brain only on events:** a capacity change (ok, tight or critical),
   a reclaim hint (idle agents holding memory while it is short), a ROOM nudge
-  that is due (advise mode), or an hourly tick.
+  that is due (advise mode), quadrants gone quiet, a Brain closing, or an hourly
+  tick.
 - **Reports** to you in one or two sentences in Brain Chat, only when something
   changed.
 - **Advises** (opt-in) your other Brains: HOLD when memory gets tight, ALL CLEAR
@@ -37,6 +38,14 @@ tight, and points out which idle agents are holding memory.
   go to Brains that are working right now and repeat every `ROOM_EVERY_MIN`
   minutes while the room lasts. A Brain with nothing to split runs one command
   to pause its nudges.
+- **Flags finished quadrants:** when a quadrant's agent has been quiet for 30
+  minutes, it tells you (and, in advise mode, the Brain that owns it) so the agent
+  and its dev server can be closed.
+- **Cleans up after a closed Brain** (opt-in, `ON_BRAIN_CLOSE=free`): once a
+  Brain shuts down, it frees the quadrants that Brain used as soon as their
+  agents have finished: stops their dev servers, unpins stopped quadrants, and
+  closes a tab only when everything in it belonged to that Brain. Busy agents
+  and quadrants another open Brain uses are never touched.
 - **Spots problems:** a quadrant whose agent is working in a different folder from
   the one it is pinned to, agents with no quadrant, Brains with duplicate names,
   plan accounts near their limit.
@@ -46,9 +55,11 @@ tight, and points out which idle agents are holding memory.
 
 ## What it never does
 
-It never kills a process (apart from its own watcher), stops an agent, closes a
-tab, repins a quadrant, switches accounts or providers, or runs git in your
-projects. It suggests; you and your Brains decide.
+It never kills a process (apart from its own watcher), switches accounts or
+providers, or runs git in your projects. It never stops an agent, closes a tab
+or repins a quadrant either, with one opt-in exception: with
+`ON_BRAIN_CLOSE=free` it cleans up the finished quadrants of a Brain that has
+closed. Otherwise it suggests; you and your Brains decide.
 
 ## Requirements
 
@@ -119,6 +130,8 @@ win over the file.
 | `ROOM_MIN` | 2 | nudge only when at least this many more agents fit |
 | `ROOM_EVERY_MIN` | 60 | minutes between ROOM nudges to the same Brain |
 | `ROOM_DECLINE_MIN` | 60 | how long a Brain's "nothing to split" pauses its nudges |
+| `DONE_EVERY_MIN` | 60 | how often the same quiet quadrant can be reported again |
+| `ON_BRAIN_CLOSE` | `report` | `report`: list a closed Brain's leftover quadrants. `free`: clean them up |
 | `AGENT_BINARIES` | `claude codex` | process names that count as agents |
 
 **Push harder.** To have Brains use every quadrant memory allows, set
@@ -132,7 +145,7 @@ that receives it, so it uses plan usage.
 ```
 fleet-watch.sh  (background job in the supervisor Brain, no tokens)
    │  every 60 s: fleet-sample.sh → snapshot.json + history.jsonl
-   │  exits on STATE / RECLAIM / ROOM / TICK
+   │  exits on STATE / RECLAIM / ROOM / DONE / BRAIN_CLOSED / TICK
    ▼
 supervisor Brain wakes
    │  reads snapshot.json, lists quadrants and Brains
@@ -158,7 +171,8 @@ any Brain about to fan out
 
 Files in `~/.codus-supervisor`: `config.env`, `snapshot.json`,
 `history.jsonl`, `events.log`, `advice.json`, `sent.log`, `reported.log`,
-`room.state`, `decline.log`, `watch.pid`, `watch.state`.
+`room.state`, `decline.log`, `done.state`, `closed.json`, `freed.log`,
+`watch.pid`, `watch.state`.
 
 ## Cost
 
@@ -172,7 +186,8 @@ Files in `~/.codus-supervisor`: `config.env`, `snapshot.json`,
 - It can't see what other Brains have queued, so it can say there's room but
   can't know whether a Brain has work that splits cleanly. That judgement stays
   with each Brain.
-- codus has no tool to stop one idle agent, so freeing memory is left to you.
+- codus has no tool to stop one agent, so a finished agent in a shared tab
+  still needs closing by hand; the supervisor tells you which.
 - The supervisor lives in one Brain's session. If that Brain restarts, ask it to
   start supervising again.
 - macOS only for now.
@@ -192,7 +207,7 @@ Most of this belongs inside codus itself:
 ## Development
 
 ```sh
-sh tests/run.sh      # 65 offline checks plus one live read-only snapshot
+sh tests/run.sh      # 76 offline checks plus one live read-only snapshot
 ```
 
 - `skills/codus-supervisor/scripts/`: `lib.sh` (settings), `fleet-sample.sh`,

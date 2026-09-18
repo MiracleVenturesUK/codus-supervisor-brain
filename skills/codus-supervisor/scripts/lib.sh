@@ -23,7 +23,7 @@ cs_load_config() {
       INTERVAL_SEC | TICK_MIN | IDLE_MIN | BUSY_MIN | FREE_TIGHT_PCT | FREE_CRIT_PCT | \
       RESERVE_PCT | SWAP_HEAVY_PCT | MAX_EXTRA_AGENTS | DEFAULT_AGENT_MB | RECLAIM_MB | \
       RECLAIM_COOLDOWN_MIN | HISTORY_MAX_LINES | AGENT_BINARIES | MODE | COOLDOWN_MIN | \
-      ROOM_MIN | ROOM_EVERY_MIN | ROOM_DECLINE_MIN)
+      ROOM_MIN | ROOM_EVERY_MIN | ROOM_DECLINE_MIN | DONE_EVERY_MIN | ON_BRAIN_CLOSE)
         # Only fill keys the environment has not already set.
         eval "cs_isset=\${$cs_key+x}"
         [ -z "$cs_isset" ] && eval "$cs_key=\$cs_val"
@@ -61,7 +61,10 @@ cs_num COOLDOWN_MIN 60          # supervisor Brain: minutes between HOLD/ALLCLEA
 cs_num ROOM_MIN 2               # advise mode: nudge only when at least this many agents fit
 cs_num ROOM_EVERY_MIN 60        # advise mode: minutes between ROOM nudges to the same Brain
 cs_num ROOM_DECLINE_MIN 60      # advise mode: quiet period after a Brain says it has nothing to split
+cs_num DONE_EVERY_MIN 60        # minutes before the same idle quadrant is reported as done again
 : "${AGENT_BINARIES:=claude codex}"
 case ${MODE:-report} in advise) MODE=advise ;; *) MODE=report ;; esac
+# When a Brain closes: report its quadrants to the user, or free them.
+case ${ON_BRAIN_CLOSE:-report} in free) ON_BRAIN_CLOSE=free ;; *) ON_BRAIN_CLOSE=report ;; esac
 
 [ "$INTERVAL_SEC" -ge 1 ] || INTERVAL_SEC=1

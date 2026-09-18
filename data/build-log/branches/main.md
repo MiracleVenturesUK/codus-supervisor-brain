@@ -222,3 +222,38 @@ Decisions:
 
 ### 2026-09-18: SKILL wording
 - "When the watcher exits" now lists ROOM among the events that wake the Brain.
+
+### 2026-09-18: quadrant lifecycle (DONE, BRAIN_CLOSED, ON_BRAIN_CLOSE)
+- Requests: tell Brains to close quadrants once their tasks are complete; when a
+  Brain is closed, clear and free the quadrants it used.
+- What codus allows (checked against the tool docs): no tool stops one
+  quadrant's agent; `brain_stop_aux` stops its dev/workers/free services;
+  `brain_set_quadrant_cwd(null)` unpins but explicitly leaves a running agent in
+  its old folder; `brain_close_tab` stops everything in a whole tab and needs the
+  user's authorisation. The missing per-agent stop was reported to codus.
+- "Task complete" signal: codus task counters stay 0 for inbox-delegated work, so
+  the only reliable signal is idle time (no session write and no CPU for
+  IDLE_MIN). The owning Brain judges whether the work is really finished.
+- `fleet-sample.sh`: `brains_live` (every running Brain except the supervisor) and
+  `idle_quadrants` (`id:MB:idle-minutes`).
+- `fleet-watch.sh`: DONE for quiet quadrants (per-quadrant `done.state`, once per
+  DONE_EVERY_MIN); BRAIN_CLOSED when a Brain seen running is missing for two
+  samples in a row (`brains_seen` / `brains_missing` in `watch.state`, so a
+  restart or provider switch that misses one sample is not a close).
+  `stamp_ids` helper now shared by room.state and done.state.
+- `lib.sh`: DONE_EVERY_MIN (60), ON_BRAIN_CLOSE (`report` default, or `free`).
+- SKILL: DONE handling (message the owning Brain in advise mode, one chat line to
+  the user at most every 6 hours per quadrant); Closed Brains procedure: confirm
+  not live, ownership = linked + delegated − excluded, skip quadrants another
+  live Brain owns, never touch busy/recent agents (kept pending in
+  `closed.json`), and with `free`: stop aux services, unpin stopped quadrants,
+  close a tab only when every quadrant in it can be freed (dry run first),
+  otherwise leave pinned and tell the user; every action in `freed.log` with the
+  old folder. Ownership is now built in both modes. Hard rules gained the one
+  opt-in exception.
+- Rejected: having the supervisor unpin quadrants whose agent is still running
+  (recreates the pin/cwd mismatch); and killing agent processes directly (no
+  exact-resume guarantee, and it bypasses codus).
+- Tests: 9 new (brains_live, BRAIN_CLOSED after two misses, not after one,
+  marker cleared, idle_quadrants format, DONE fires, DONE cooldown,
+  ON_BRAIN_CLOSE validation). 77 passed, 0 failed.

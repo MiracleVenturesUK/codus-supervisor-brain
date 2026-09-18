@@ -271,6 +271,8 @@ END {
     agents_mb += tm
     label = (role == "quadrant") ? "Q" comp : (role == "brain") ? brain : (role == "codus") ? name : abin[a] ":" a
     lab[a] = label; rol[a] = role; bid[a] = brain; stat[a] = st
+    if (role == "quadrant" && st == "idle")
+      idle_q = idle_q (idle_q == "" ? "" : ",") comp ":" tm ":" la
     if (st == "idle") {
       idle_mb += tm
       idle_list = idle_list (idle_list == "" ? "" : ",") label " " tm "MB " la "m"
@@ -289,11 +291,13 @@ END {
   }
   self_label = (sa != "" && (sa in lab)) ? lab[sa] : ""
 
-  # Brains that are working right now (busy or recent), other than this one.
-  active = ""; active_json = ""
+  # Brains running right now, and those working (busy or recent); never this one.
+  active = ""; active_json = ""; live = ""; live_json = ""
   for (i = 1; i <= norder; i++) {
     a = order[i]
     if (!(a in lab) || rol[a] != "brain" || a == sa) continue
+    live = live (live == "" ? "" : ",") bid[a]
+    live_json = live_json (live_json == "" ? "" : ",") jstr(bid[a])
     if (stat[a] != "busy" && stat[a] != "recent") continue
     active = active (active == "" ? "" : ",") bid[a]
     active_json = active_json (active_json == "" ? "" : ",") jstr(bid[a])
@@ -347,7 +351,7 @@ END {
     printf "\"memory\":{\"total_mb\":%d,\"pressure\":%s,\"pressure_level\":%d,\"free_pct\":%d,\"swap_used_mb\":%d,\"swap_total_mb\":%d,\"compressed_mb\":%d},", total_mb, jstr(level_name), level, free_pct, swap_used_mb, swap_total_mb, compressed_mb > jout
     printf "\"capacity\":{\"state\":%s,\"reason\":%s,\"est_extra_agents\":%d,\"avg_agent_mb\":%d,\"reserve_mb\":%d,\"swap_heavy\":%s},", jstr(state), jstr(reason), extra, int(avg + 0.5), reserve_mb, (swap_heavy ? "true" : "false") > jout
     printf "\"agents\":{\"total\":%d,\"busy\":%d,\"idle\":%d,\"recent\":%d,\"unknown\":%d,\"agents_mb\":%d,\"idle_mb\":%d},", n, nbusy, nidle, nrecent, nunknown, agents_mb, idle_mb > jout
-    printf "\"self\":%s,\"active_brains\":[%s],", jopt(self_label), active_json > jout
+    printf "\"self\":%s,\"active_brains\":[%s],\"brains_live\":[%s],", jopt(self_label), active_json, live_json > jout
     printf "\"agent_list\":[%s],\"top_groups\":[%s],\"usage\":%s,", agents_json, groups, (usage == "" ? "null" : usage) > jout
     printf "\"config\":{\"mode\":%s,\"idle_min\":%d,\"busy_min\":%d,\"free_tight_pct\":%d,\"free_crit_pct\":%d,\"reserve_pct\":%d,\"swap_heavy_pct\":%d,\"max_extra_agents\":%d},", jstr(cs_mode), idle_min, busy_min, free_tight, free_crit, reserve_pct, swap_heavy_pct, max_extra > jout
     printf "\"summary\":%s}\n", jstr(summary) > jout
@@ -369,5 +373,7 @@ END {
   print "idle_list=" idle_list
   print "self=" self_label
   print "active_brains=" active
+  print "brains_live=" live
+  print "idle_quadrants=" idle_q
   print "summary=" summary
 }' "$tmp/activity" "$tmp/cwd" "$tmp/agents" "$tmp/usage" "$tmp/ps"

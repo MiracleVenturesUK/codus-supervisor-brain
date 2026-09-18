@@ -18,7 +18,7 @@ job), by any Brain via `codus-capacity-check`, or by hand from a terminal.
   last activity, status), top memory groups, optional plan usage, capacity
   state and room estimate.
 - `fleet-watch.sh`: sampling loop with events STATE, RECLAIM, ROOM (advise mode),
-  TICK, ERROR, ALREADY_RUNNING; `--once`, `--exit-on-event`, `--stop`,
+  DONE, BRAIN_CLOSED, TICK, ERROR, ALREADY_RUNNING; `--once`, `--exit-on-event`, `--stop`,
   `--decline <brain id>`.
 - Self detection: the sampler reports the agent it runs under (`self`) and the
   Brains working right now (`active_brains`), so ROOM never targets the supervisor.
@@ -35,6 +35,7 @@ job), by any Brain via `codus-capacity-check`, or by hand from a terminal.
 | `watch.pid`, `watch.state` | watcher | single instance; hysteresis and cooldown memory |
 | `room.state` | watcher | last ROOM nudge time per Brain |
 | `decline.log` | other Brains via `--decline` | Brains with nothing to split right now |
+| `done.state` | watcher | last DONE report time per quadrant |
 
 ## Interface
 
@@ -68,6 +69,7 @@ job), by any Brain via `codus-capacity-check`, or by hand from a terminal.
 
 ## Build log
 
+- 2026-09-18: DONE and BRAIN_CLOSED events, `brains_live` / `idle_quadrants`. See [main](../../data/build-log/branches/main.md).
 - 2026-09-18: `--stop` waits for the watcher to exit; the sleep no longer delays signals. See [main](../../data/build-log/branches/main.md).
 - 2026-09-18: ROOM nudges decided in the watcher, `--decline`, self detection. See [main](../../data/build-log/branches/main.md).
 - 2026-09-18: initial sampler, watcher, settings and tests. See [main](../../data/build-log/branches/main.md).

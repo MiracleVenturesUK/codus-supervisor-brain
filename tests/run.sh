@@ -223,6 +223,28 @@ case $out in *ROOM*) bad "no ROOM below ROOM_MIN" "$out" ;; *) ok "no ROOM below
 reset_state last_state=ok
 out=$(CS_TEST_PRESSURE_LEVEL=4 run_to 20 "$W" --exit-on-event --interval 1 --max-seconds 15)
 case $out in *" STATE ok->critical "*" brains=main "*) ok "STATE lists the working Brains for HOLD" ;; *) bad "STATE brains=" "$out" ;; esac
+
+echo "lifecycle (DONE, BRAIN_CLOSED)"
+check "running Brains listed, supervisor excluded" "brain-abc,main" "$(printf '%s\n' "$kv" | sed -n 's/^brains_live=//p')"
+reset_state last_state=ok brains_seen=brain-abc,main,brain-gone
+out=$(run_to 20 "$W" --exit-on-event --interval 1 --max-seconds 15)
+case $out in *" BRAIN_CLOSED brains=brain-gone"*) ok "a Brain gone for two samples is reported closed" ;; *) bad "BRAIN_CLOSED" "$out" ;; esac
+check "closed Brain no longer tracked" "brains_seen=brain-abc,main" "$(grep '^brains_seen=' "$H/watch.state")"
+reset_state last_state=ok brains_seen=brain-abc,main brains_missing=brain-abc
+out=$(run_to 20 "$W" --exit-on-event --interval 1 --max-seconds 2)
+case $out in *BRAIN_CLOSED*) bad "a Brain back after one missed sample is not closed" "$out" ;; *) ok "a Brain back after one missed sample is not closed" ;; esac
+check "missed-sample marker cleared" "brains_missing=" "$(grep '^brains_missing=' "$H/watch.state")"
+cp "$work/activity2" "$work/activity3"
+sed -i.bak "s/^100$tab.*/100$tab$((NOW - 3600))/" "$work/activity3"
+export CS_TEST_ACTIVITY_FILE="$work/activity3"
+check "idle quadrants listed as id:MB:minutes" "7:700:60" "$("$S/fleet-sample.sh" --kv | sed -n 's/^idle_quadrants=//p')"
+reset_state last_state=ok
+out=$(run_to 20 "$W" --exit-on-event --interval 1 --max-seconds 15)
+case $out in *" DONE quadrants=7:700:60 "*) ok "DONE reports a quadrant that has gone quiet" ;; *) bad "DONE" "$out" ;; esac
+out=$(run_to 20 "$W" --exit-on-event --interval 1 --max-seconds 2)
+case $out in *DONE*) bad "DONE waits DONE_EVERY_MIN before repeating" "$out" ;; *) ok "DONE waits DONE_EVERY_MIN before repeating" ;; esac
+check "ON_BRAIN_CLOSE only accepts free or report" "report free" "$(ON_BRAIN_CLOSE=nuke sh -c '. "$1/lib.sh"; printf %s "$ON_BRAIN_CLOSE"' _ "$S") $(ON_BRAIN_CLOSE=free sh -c '. "$1/lib.sh"; printf %s "$ON_BRAIN_CLOSE"' _ "$S")"
+
 export CS_TEST_PS_FILE="$work/ps" CS_TEST_CWD_FILE="$work/cwd" CS_TEST_ACTIVITY_FILE="$work/activity"
 unset CS_TEST_SELF_PID
 
